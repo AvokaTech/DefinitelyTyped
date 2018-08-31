@@ -4,49 +4,112 @@
 //                 Alex Gorbatchev <https://github.com/alexgorbatchev>,
 //                 Alec Hill <https://github.com/alechill>
 //                 Alexey Pelykh <https://github.com/alexey-pelykh>
+//                 Jack Coulter <https://github.com/jscinoz>
 // Definitions: https://github.com/DefinitelyTyped/DefinitelyTyped
-// TypeScript Version: 2.2
+// TypeScript Version: 2.8
 
 export as namespace ReduxActions;
 
+import { Action as ReduxAction, Reducer as ReduxReducer } from "redux";
+
 // FSA-compliant action.
 // See: https://github.com/acdlite/flux-standard-action
-export interface BaseAction {
-    type: string;
-}
-
-export interface Action<Payload> extends BaseAction {
+export interface BaseAction<T, Payload> extends ReduxAction<T> {
     payload?: Payload;
     error?: boolean;
 }
 
-export interface ActionMeta<Payload, Meta> extends Action<Payload> {
+export interface BaseActionMeta<T, Payload, Meta> extends BaseAction<T, Payload> {
     meta: Meta;
 }
+
+export type AnyAction = BaseAction<any, any>;
+export type AnyActionMeta = BaseActionMeta<any, any, any>;
+
+// Allows us to correctly map the values in ReducerMap
+export type GetActionTypeMap<Action extends AnyAction> =
+  Action extends BaseAction<infer ActionType, infer Payload>
+    ? ActionType extends string
+      ? {
+        [ConcreteActionType in ActionType]: BaseAction<ActionType, Payload>;
+      }
+      : never
+    : never;
+
+export type GetActionMetaTypeMap<ActionMeta extends AnyActionMeta> =
+  ActionMeta extends BaseActionMeta<infer ActionType, infer Payload, infer Meta>
+    ? ActionType extends string
+      ? {
+        [ConcreteActionType in ActionType]:
+          BaseActionMeta<ActionType, Payload, Meta>;
+      }
+      : never
+    : never;
+
+export type GetActionType<Action extends AnyAction> =
+  Action extends BaseAction<infer ActionType, any> ? ActionType : never;
+
+export type GetActionPayload<Action extends AnyAction> =
+  Action extends BaseAction<any, infer Payload> ? Payload : never;
+
+export type GetActionMeta<ActionMeta extends AnyActionMeta> =
+  ActionMeta extends BaseActionMeta<any, any, infer Meta> ? Meta : never;
 
 // https://github.com/redux-utilities/redux-actions/blob/v2.3.0/src/combineActions.js#L27
 export interface CombinedActionType {
     _dummy: undefined;
 }
 
-export type ReducerMapValue<State, Payload> = Reducer<State, Payload> | ReducerNextThrow<State, Payload> | ReducerMap<State, Payload>;
+export type ReducerMapValue<State, Action extends AnyAction> =
+  Reducer<State, Action> |
+  ReducerNextThrow<State, Action> |
+  ReducerMap<State, Action>;
 
-export interface ReducerMap<State, Payload> {
-    [actionType: string]: ReducerMapValue<State, Payload>;
+export type StringKeys<O> = Extract<keyof O, string>;
+
+export type AssertAction<Action> =
+  Action extends BaseAction<infer ActionType, infer Payload>
+    ? BaseAction<ActionType, Payload>
+    : never;
+
+export type AssertActionMeta<ActionMeta> =
+  ActionMeta extends BaseActionMeta<infer ActionType, infer Payload, infer Meta>
+    ? BaseActionMeta<ActionType, Payload, Meta>
+    : never;
+
+export type ReducerMap<
+  State,
+  Action extends AnyAction,
+  ActionTypeMap = GetActionTypeMap<Action>
+> = {
+  [ConcreteActionType in StringKeys<ActionTypeMap>]?:
+    ReducerMapValue<State, AssertAction<ActionTypeMap[ConcreteActionType]>>;
+};
+
+export type ReducerMapMetaValue<State, ActionMeta extends AnyActionMeta> =
+  ReducerMeta<State, ActionMeta> |
+  ReducerNextThrowMeta<State, ActionMeta>;
+
+export type ReducerMapMeta<
+  State,
+  ActionMeta extends AnyActionMeta,
+  ActionMetaTypeMap = GetActionMetaTypeMap<ActionMeta>
+> = {
+  [ConcreteActionType in StringKeys<ActionMetaTypeMap>]?:
+    ReducerMapMetaValue<
+      State,
+      AssertActionMeta<ActionMetaTypeMap[ConcreteActionType]>
+    >;
+};
+
+export interface ReducerNextThrow<State, Action extends AnyAction> {
+    next?(state: State, action: Action): State;
+    throw?(state: State, action: Action): State;
 }
 
-export interface ReducerMapMeta<State, Payload, Meta> {
-    [actionType: string]: ReducerMeta<State, Payload, Meta> | ReducerNextThrowMeta<State, Payload, Meta>;
-}
-
-export interface ReducerNextThrow<State, Payload> {
-    next?(state: State, action: Action<Payload>): State;
-    throw?(state: State, action: Action<Payload>): State;
-}
-
-export interface ReducerNextThrowMeta<State, Payload, Meta> {
-    next?(state: State, action: ActionMeta<Payload, Meta>): State;
-    throw?(state: State, action: ActionMeta<Payload, Meta>): State;
+export interface ReducerNextThrowMeta<State, ActionMeta extends AnyActionMeta> {
+    next?(state: State, action: ActionMeta): State;
+    throw?(state: State, action: ActionMeta): State;
 }
 
 export type BaseActionFunctions<TAction> =
@@ -57,13 +120,20 @@ export type BaseActionFunctions<TAction> =
     ActionFunction4<any, any, any, any, TAction> |
     ActionFunctionAny<TAction>;
 
-export type ActionFunctions<Payload> = BaseActionFunctions<Action<Payload>>;
+export type ActionFunctions<Action extends AnyAction> = BaseActionFunctions<Action>;
 
-export type ActionWithMetaFunctions<Payload, Meta> = BaseActionFunctions<ActionMeta<Payload, Meta>>;
+export type ActionWithMetaFunctions<Action extends AnyActionMeta> =
+  BaseActionFunctions<Action>;
 
-export type Reducer<State, Payload> = (state: State, action: Action<Payload>) => State;
+export type Reducer<State, Action extends AnyAction> =
+  Action extends BaseAction<infer ActionType, infer Payload>
+    ? ReduxReducer<State, BaseAction<ActionType, Payload>>
+    : never;
 
-export type ReducerMeta<State, Payload, Meta> = (state: State, action: ActionMeta<Payload, Meta>) => State;
+export type ReducerMeta<State, ActionMeta extends AnyActionMeta> =
+  ActionMeta extends BaseActionMeta<infer ActionType, infer Payload, infer Meta>
+    ? ReduxReducer<State, BaseActionMeta<ActionType, Payload, Meta>>
+    : never;
 
 /** argument inferring borrowed from lodash definitions */
 export type ActionFunction0<R> = () => R;
@@ -75,122 +145,164 @@ export type ActionFunctionAny<R> = (...args: any[]) => R;
 
 // https://github.com/redux-utilities/redux-actions/blob/v2.3.0/src/createAction.js#L6
 export function createAction(
-    actionType: string
-): ActionFunctionAny<Action<any>>;
+  actionType: string
+): ActionFunctionAny<BaseAction<string, any>>;
 
-export function createAction<Payload>(
-    actionType: string,
-    payloadCreator: ActionFunction0<Payload>
-): ActionFunction0<Action<Payload>>;
+export function createAction<Action extends AnyAction>(
+  actionType: GetActionType<Action>,
+  payloadCreator: ActionFunction0<GetActionPayload<Action>>
+): ActionFunction0<Action>;
 
-export function createAction<Payload, Arg1>(
-    actionType: string,
-    payloadCreator: ActionFunction1<Arg1, Payload>
-): ActionFunction1<Arg1, Action<Payload>>;
+export function createAction<Action extends AnyAction, Arg1>(
+  actionType: GetActionType<Action>,
+  payloadCreator: ActionFunction1<Arg1, GetActionPayload<Action>>
+): ActionFunction1<Arg1, Action>;
 
-export function createAction<Payload, Arg1, Arg2>(
-    actionType: string,
-    payloadCreator: ActionFunction2<Arg1, Arg2, Payload>
-): ActionFunction2<Arg1, Arg2, Action<Payload>>;
+export function createAction<Action extends AnyAction, Arg1, Arg2>(
+  actionType: GetActionType<Action>,
+  payloadCreator: ActionFunction2<Arg1, Arg2, GetActionPayload<Action>>
+): ActionFunction2<Arg1, Arg2, Action>;
 
-export function createAction<Payload, Arg1, Arg2, Arg3>(
-    actionType: string,
-    payloadCreator: ActionFunction3<Arg1, Arg2, Arg3, Payload>
-): ActionFunction3<Arg1, Arg2, Arg3, Action<Payload>>;
+export function createAction<Action extends AnyAction, Arg1, Arg2, Arg3>(
+  actionType: GetActionType<Action>,
+  payloadCreator: ActionFunction3<Arg1, Arg2, Arg3, GetActionPayload<Action>>
+): ActionFunction3<Arg1, Arg2, Arg3, Action>;
 
-export function createAction<Payload, Arg1, Arg2, Arg3, Arg4>(
-    actionType: string,
-    payloadCreator: ActionFunction4<Arg1, Arg2, Arg3, Arg4, Payload>
-): ActionFunction4<Arg1, Arg2, Arg3, Arg4, Action<Payload>>;
+export function createAction<Action extends AnyAction, Arg1, Arg2, Arg3, Arg4>(
+  actionType: GetActionType<Action>,
+  payloadCreator: ActionFunction4<Arg1, Arg2, Arg3, Arg4, GetActionPayload<Action>>
+): ActionFunction4<Arg1, Arg2, Arg3, Arg4, Action>;
 
-export function createAction<Payload>(
-    actionType: string
-): ActionFunction1<Payload, Action<Payload>>;
+export function createAction<Action extends AnyAction>(
+  actionType: GetActionType<Action>,
+): ActionFunction1<GetActionPayload<Action>, Action>;
 
-export function createAction<Meta>(
-    actionType: string,
-    payloadCreator: null | undefined,
-    metaCreator: ActionFunctionAny<Meta>
-): ActionFunctionAny<ActionMeta<any, Meta>>;
+export function createAction<ActionMeta extends AnyActionMeta>(
+  actionType: GetActionType<ActionMeta>,
+  payloadCreator:
+    null |
+    undefined |
+    ActionFunctionAny<GetActionPayload<ActionMeta>>,
+  metaCreator: ActionFunctionAny<GetActionMeta<ActionMeta>>
+): ActionFunctionAny<ActionMeta>;
 
-export function createAction<Payload, Meta>(
-    actionType: string,
-    payloadCreator: ActionFunctionAny<Payload>,
-    metaCreator: ActionFunctionAny<Meta>
-): ActionFunctionAny<ActionMeta<Payload, Meta>>;
+export function createAction<
+  ActionMeta extends AnyActionMeta,
+  Arg1
+>(
+  actionType: GetActionType<ActionMeta>,
+  payloadCreator: ActionFunction1<Arg1, GetActionPayload<ActionMeta>>,
+  metaCreator: ActionFunction1<Arg1, GetActionMeta<ActionMeta>>
+): ActionFunction1<Arg1, ActionMeta>;
 
-export function createAction<Payload, Meta, Arg1>(
-    actionType: string,
-    payloadCreator: ActionFunction1<Arg1, Payload>,
-    metaCreator: ActionFunction1<Arg1, Meta>
-): ActionFunction1<Arg1, ActionMeta<Payload, Meta>>;
+export function createAction<
+  ActionMeta extends AnyActionMeta,
+  Arg1, Arg2
+>(
+  actionType: GetActionType<ActionMeta>,
+  payloadCreator: ActionFunction2<Arg1, Arg2, GetActionPayload<ActionMeta>>,
+  metaCreator: ActionFunction2<Arg1, Arg2, GetActionMeta<ActionMeta>>
+): ActionFunction2<Arg1, Arg2, ActionMeta>;
 
-export function createAction<Payload, Meta, Arg1, Arg2>(
-    actionType: string,
-    payloadCreator: ActionFunction2<Arg1, Arg2, Payload>,
-    metaCreator: ActionFunction2<Arg1, Arg2, Meta>
-): ActionFunction2<Arg1, Arg2, ActionMeta<Payload, Meta>>;
+export function createAction<
+  ActionMeta extends AnyActionMeta,
+  Arg1, Arg2, Arg3
+>(
+  actionType: GetActionType<ActionMeta>,
+  payloadCreator: ActionFunction3<Arg1, Arg2, Arg3, GetActionPayload<ActionMeta>>,
+  metaCreator: ActionFunction3<Arg1, Arg2, Arg3, GetActionMeta<ActionMeta>>
+): ActionFunction3<Arg1, Arg2, Arg3, ActionMeta>;
 
-export function createAction<Payload, Meta, Arg1, Arg2, Arg3>(
-    actionType: string,
-    payloadCreator: ActionFunction3<Arg1, Arg2, Arg3, Payload>,
-    metaCreator: ActionFunction3<Arg1, Arg2, Arg3, Meta>
-): ActionFunction3<Arg1, Arg2, Arg3, ActionMeta<Payload, Meta>>;
+export function createAction<
+  ActionMeta extends AnyActionMeta,
+  Arg1, Arg2, Arg3, Arg4
+>(
+  actionType: GetActionType<ActionMeta>,
+  payloadCreator: ActionFunction4<Arg1, Arg2, Arg3, Arg4, GetActionPayload<ActionMeta>>,
+  metaCreator: ActionFunction4<Arg1, Arg2, Arg3, Arg4, GetActionMeta<ActionMeta>>
+): ActionFunction4<Arg1, Arg2, Arg3, Arg4, ActionMeta>;
 
-export function createAction<Payload, Meta, Arg1, Arg2, Arg3, Arg4>(
-    actionType: string,
-    payloadCreator: ActionFunction4<Arg1, Arg2, Arg3, Arg4, Payload>,
-    metaCreator: ActionFunction4<Arg1, Arg2, Arg3, Arg4, Meta>
-): ActionFunction4<Arg1, Arg2, Arg3, Arg4, ActionMeta<Payload, Meta>>;
-
-export function handleAction<State, Payload>(
-    actionType: string | ActionFunctions<Payload> | CombinedActionType,
-    reducer: Reducer<State, Payload> | ReducerNextThrow<State, Payload>,
+export function handleAction<State, Action extends AnyAction>(
+    actionType:
+      GetActionType<Action> |
+      ActionFunctions<Action> |
+      CombinedActionType,
+    reducer:
+      Reducer<State, GetActionPayload<Action>> |
+      ReducerNextThrow<State, GetActionPayload<Action>>,
     initialState: State
-): Reducer<State, Payload>;
+): ReduxReducer<State, Action>;
 
-export function handleAction<State, Payload, Meta>(
-    actionType: string | ActionWithMetaFunctions<Payload, Meta> | CombinedActionType,
-    reducer: ReducerMeta<State, Payload, Meta> | ReducerNextThrowMeta<State, Payload, Meta>,
+export function handleAction<State, ActionMeta extends AnyActionMeta>(
+    actionType:
+      GetActionType<ActionMeta> |
+      ActionWithMetaFunctions<ActionMeta> |
+      CombinedActionType,
+    reducer:
+      ReducerMeta<State, ActionMeta> |
+      ReducerNextThrowMeta<State, ActionMeta>,
     initialState: State
-): Reducer<State, Payload>;
+): ReduxReducer<State, ActionMeta>;
 
 export function handleActions<StateAndPayload>(
-    reducerMap: ReducerMap<StateAndPayload, StateAndPayload>,
+    reducerMap: ReducerMap<StateAndPayload, BaseAction<any, StateAndPayload>>,
     initialState: StateAndPayload
-): Reducer<StateAndPayload, StateAndPayload>;
+): ReduxReducer<StateAndPayload, BaseAction<any, StateAndPayload>>;
 
-export function handleActions<State, Payload>(
-    reducerMap: ReducerMap<State, Payload>,
+export function handleActions<State, Action extends AnyAction>(
+    reducerMap: ReducerMap<State, Action>,
     initialState: State
-): Reducer<State, Payload>;
+): ReduxReducer<State, Action>;
 
-export function handleActions<State, Payload, Meta>(
-    reducerMap: ReducerMapMeta<State, Payload, Meta>,
+export function handleActions<State, ActionMeta extends AnyActionMeta>(
+    reducerMap: ReducerMapMeta<State, ActionMeta>,
     initialState: State
-): ReducerMeta<State, Payload, Meta>;
+): ReduxReducer<State, ActionMeta>;
 
 // https://github.com/redux-utilities/redux-actions/blob/v2.3.0/src/combineActions.js#L21
 export function combineActions(...actionTypes: Array<ActionFunctions<any> | string | symbol>): CombinedActionType;
 
-export interface ActionMap<Payload, Meta> {
-    [actionType: string]:
-    ActionMap<Payload, Meta> |
-    ActionFunctionAny<Payload> |
-    [ActionFunctionAny<Payload>, ActionFunctionAny<Meta>] |
-    undefined;
-}
-
-export function createActions<Payload>(
-    actionMapOrIdentityAction: ActionMap<Payload, any> | string,
-    ...identityActions: string[]
-): {
-    [actionName: string]: ActionFunctionAny<Action<Payload>>
+export type ActionMap<
+  Action extends AnyAction,
+  ActionTypeMap = GetActionTypeMap<Action>
+> = {
+  [ConcreteActionType in StringKeys<ActionTypeMap>]?:
+    ActionMap<AssertAction<ActionTypeMap[ConcreteActionType]>> |
+    ActionFunctionAny<GetActionPayload<AssertAction<ActionTypeMap[ConcreteActionType]>>>;
 };
 
+export type ActionMapMeta<
+  ActionMeta extends AnyActionMeta,
+  ActionTypeMap = GetActionMetaTypeMap<ActionMeta>
+> = {
+  [ConcreteActionType in StringKeys<ActionTypeMap>]?:
+    ActionMap<AssertActionMeta<ActionTypeMap[ConcreteActionType]>> |
+    ActionFunctionAny<GetActionPayload<AssertAction<ActionTypeMap[ConcreteActionType]>>> |
+    [
+      ActionFunctionAny<GetActionPayload<AssertActionMeta<ActionTypeMap[ConcreteActionType]>>>,
+      ActionFunctionAny<GetActionMeta<AssertActionMeta<ActionTypeMap[ConcreteActionType]>>>
+    ];
+};
+
+export type ActionCreatorMap<
+  Action extends AnyAction,
+  ActionTypeMap = GetActionTypeMap<Action>
+> = {
+  [ConcreteActionType in StringKeys<ActionTypeMap>]:
+    ActionFunctionAny<BaseAction<
+      ConcreteActionType,
+      GetActionPayload<AssertAction<ActionTypeMap[ConcreteActionType]>>
+    >>;
+};
+
+export function createActions<Action extends AnyAction>(
+    actionMapOrIdentityAction: ActionMap<Action> | string,
+    ...identityActions: string[]
+): ActionCreatorMap<Action>;
+
 export function createActions(
-    actionMapOrIdentityAction: ActionMap<any, any> | string,
+    actionMapOrIdentityAction: ActionMap<any> | string,
     ...identityActions: string[]
 ): {
-    [actionName: string]: ActionFunctionAny<Action<any>>
+    [actionName: string]: ActionFunctionAny<AnyAction>
 };
