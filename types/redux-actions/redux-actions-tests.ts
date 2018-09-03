@@ -1,21 +1,21 @@
 import * as ReduxActions from 'redux-actions';
 
 let state: number;
-const minimalAction: ReduxActions.BaseAction = { type: 'INCREMENT' };
+const minimalAction: ReduxActions.BaseAction<'INCREMENT', never> = { type: 'INCREMENT' };
 
-const incrementAction: () => ReduxActions.Action<number> = ReduxActions.createAction<number>(
+const incrementAction: () => ReduxActions.BaseAction<'INCREMENT', number> = ReduxActions.createAction<number>(
     'INCREMENT', () => 1
 );
 
-const multiplyAction: (...args: number[]) => ReduxActions.Action<number> = ReduxActions.createAction<number>(
+const multiplyAction: (...args: number[]) => ReduxActions.BaseAction<number> = ReduxActions.createAction<number>(
     'MULTIPLY'
 );
 
-const action: ReduxActions.Action<number> = incrementAction();
+const action: ReduxActions.BaseAction<number> = incrementAction();
 
 const actionHandler = ReduxActions.handleAction<number, number>(
     'INCREMENT',
-    (state: number, action: ReduxActions.Action<number>) => state + action.payload,
+    (state: number, action: ReduxActions.BaseAction<number>) => state + action.payload,
     0
 );
 
@@ -23,7 +23,7 @@ state = actionHandler(0, incrementAction());
 
 const actionHandlerWithReduceMap = ReduxActions.handleAction<number, number>(
     'MULTIPLY', {
-        next(state: number, action: ReduxActions.Action<number>) {
+        next(state: number, action: ReduxActions.BaseAction<number>) {
             return state * action.payload;
         },
         throw(state: number) { return state; }
@@ -34,18 +34,18 @@ const actionHandlerWithReduceMap = ReduxActions.handleAction<number, number>(
 state = actionHandlerWithReduceMap(0, multiplyAction(10));
 
 const actionsHandler = ReduxActions.handleActions({
-    INCREMENT: (state: number, action: ReduxActions.Action<number>) => state + action.payload,
-    MULTIPLY: (state: number, action: ReduxActions.Action<number>) => state * action.payload
+    INCREMENT: (state: number, action: ReduxActions.BaseAction<number>) => state + action.payload,
+    MULTIPLY: (state: number, action: ReduxActions.BaseAction<number>) => state * action.payload
 }, 0);
 
 state = actionsHandler(0, { type: 'INCREMENT' });
 
 const actionsHandlerWithInitialState = ReduxActions.handleActions({
     INCREMENT: {
-        next: (state: number, action: ReduxActions.Action<number>) => state + action.payload,
+        next: (state: number, action: ReduxActions.BaseAction<number>) => state + action.payload,
     },
     MULTIPLY: {
-        next: (state: number, action: ReduxActions.Action<number>) => state * action.payload
+        next: (state: number, action: ReduxActions.BaseAction<number>) => state * action.payload
     }
 }, 0);
 
@@ -53,8 +53,8 @@ state = actionsHandlerWithInitialState(0, { type: 'INCREMENT' });
 
 const actionsHandlerWithRecursiveReducerMap = ReduxActions.handleActions<number, number>({
     ADJUST: {
-        UP: (state: number, action: ReduxActions.Action<number>) => state + action.payload,
-        DOWN: (state: number, action: ReduxActions.Action<number>) => state - action.payload,
+        UP: (state: number, action: ReduxActions.BaseAction<number>) => state + action.payload,
+        DOWN: (state: number, action: ReduxActions.BaseAction<number>) => state - action.payload,
     }
 }, 0);
 
@@ -76,7 +76,7 @@ interface MetaType {
 
 let typedState: TypedState;
 
-const richerAction: ReduxActions.ActionMeta<TypedState, MetaType> = {
+const richerAction: ReduxActions.BaseActionMeta<TypedState, MetaType> = {
     type: 'INCREMENT',
     error: false,
     payload: {
@@ -87,14 +87,14 @@ const richerAction: ReduxActions.ActionMeta<TypedState, MetaType> = {
     }
 };
 
-const typedIncrementAction: () => ReduxActions.Action<TypedPayload> = ReduxActions.createAction<TypedPayload>(
+const typedIncrementAction: () => ReduxActions.BaseAction<TypedPayload> = ReduxActions.createAction<TypedPayload>(
     'INCREMENT',
     () => ({ increase: 1 })
 );
 
 const typedActionHandler = ReduxActions.handleAction<TypedState, TypedPayload>(
     'INCREMENT',
-    (state: TypedState, action: ReduxActions.Action<TypedPayload>) => ({ value: state.value + 1 }),
+    (state: TypedState, action: ReduxActions.BaseAction<TypedPayload>) => ({ value: state.value + 1 }),
     {value: 1}
 );
 
@@ -104,7 +104,7 @@ actionNoArgs.payload.increase = 1;
 typedState = typedActionHandler({ value: 0 }, actionNoArgs);
 
 const typedIncrementAction1TypedArg: (value: number) =>
-    ReduxActions.Action<TypedPayload> = ReduxActions.createAction<TypedPayload, number>(
+    ReduxActions.BaseAction<TypedPayload> = ReduxActions.createAction<TypedPayload, number>(
         'INCREMENT',
         amount => ({ increase: amount })
     );
@@ -113,7 +113,7 @@ const actionFrom1Arg = typedIncrementAction1TypedArg(10);
 actionFrom1Arg.payload.increase === 10;
 
 const typedIncrementAction2TypedArgs: (numericAmount: number, stringAmount: string) =>
-ReduxActions.Action<TypedPayload> = ReduxActions.createAction<TypedPayload, number, string>(
+ReduxActions.BaseAction<TypedPayload> = ReduxActions.createAction<TypedPayload, number, string>(
     'INCREMENT',
     (numericAmount, stringAmount) => ({ increase: numericAmount + parseInt(stringAmount, 10) })
 );
@@ -123,14 +123,14 @@ actionFrom1Arg.payload.increase === 110;
 
 const typedActionHandlerReducerMap = ReduxActions.handleActions(
     {
-        INCREMENT: (state: TypedState, action: ReduxActions.Action<any>) => ({ value: state.value + 1 })
+        INCREMENT: (state: TypedState, action: ReduxActions.BaseAction<any>) => ({ value: state.value + 1 })
     },
     {value: 1}
 );
 
 typedState = typedActionHandlerReducerMap({ value: 0 }, actionFrom1Arg);
 
-const typedIncrementByActionWithMetaAnyArgs: (...args: any[]) => ReduxActions.ActionMeta<TypedPayload, MetaType> =
+const typedIncrementByActionWithMetaAnyArgs: (...args: any[]) => ReduxActions.BaseActionMeta<TypedPayload, MetaType> =
     ReduxActions.createAction<TypedPayload, MetaType>(
         'INCREMENT_BY',
         amount => ({ increase: amount }),
@@ -143,7 +143,7 @@ actionMetaFromAnyArgs.meta.remote;
 
 const typedActionHandlerWithMeta = ReduxActions.handleAction<TypedState, TypedPayload, MetaType>(
     'INCREMENT_BY', {
-        next(state: TypedState, action: ReduxActions.ActionMeta<TypedPayload, MetaType>) {
+        next(state: TypedState, action: ReduxActions.BaseActionMeta<TypedPayload, MetaType>) {
             return action.meta.remote ? state : { value: state.value + action.payload.increase };
         },
         throw(state: TypedState) { return state; }
@@ -156,7 +156,7 @@ typedState = typedActionHandlerWithMeta({ value: 0 }, typedIncrementByActionWith
 const typedActionHandlerReducerMetaMap = ReduxActions.handleActions<TypedState, TypedPayload, MetaType>(
     {
         INCREMENT_BY: {
-            next(state: TypedState, action: ReduxActions.ActionMeta<TypedPayload, MetaType>) {
+            next(state: TypedState, action: ReduxActions.BaseActionMeta<TypedPayload, MetaType>) {
                 return action.meta.remote ? state : { value: state.value + action.payload.increase };
             },
             throw(state: TypedState) { return state; }
@@ -167,7 +167,7 @@ const typedActionHandlerReducerMetaMap = ReduxActions.handleActions<TypedState, 
 
 typedState = typedActionHandlerReducerMetaMap({ value: 0 }, actionMetaFromAnyArgs);
 
-const typedActionWithMeta1TypedArg: (value: number) => ReduxActions.ActionMeta<TypedPayload, MetaType> =
+const typedActionWithMeta1TypedArg: (value: number) => ReduxActions.BaseActionMeta<TypedPayload, MetaType> =
     ReduxActions.createAction(
         'INCREMENT_BY',
         amount => ({ increase: amount }),
@@ -180,7 +180,7 @@ actionMetaFrom1Arg.meta.remote;
 
 typedState = typedActionHandlerReducerMetaMap({ value: 0 }, actionMetaFrom1Arg);
 
-const typedActionWithMeta2TypedArgs: (value: number, remote: boolean) => ReduxActions.ActionMeta<TypedPayload, MetaType> =
+const typedActionWithMeta2TypedArgs: (value: number, remote: boolean) => ReduxActions.BaseActionMeta<TypedPayload, MetaType> =
     ReduxActions.createAction(
         'INCREMENT_BY',
         (amount, remote)  => ({ increase: amount }),
